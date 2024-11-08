@@ -12,7 +12,7 @@
 # * Bey, Patrik, Charité Universitätsmedizin Berlin, Berlin Institute of Health
 # 
 #
-# * last update: 2024.09.06
+# * last update: 2024.11.08
 #
 #
 #
@@ -24,7 +24,9 @@
 # FUNCTIONS: 
 # 1. show_usage     :   help function to display usage of analysis framework
 # 2. log_msg        :   printing logging statements to std_out
-# 3. check_variable :   check if defined variable is present in environment
+# 3. get_list_size  :   Extracting the length of a given list of strings
+# 4. get_temp_dir   :   creating a temporary directory with random naming
+# 5. progress_bar   :   provide progressbar functionality for visual progress tracking
 
 #############################################
 #                                           #
@@ -64,13 +66,18 @@ docker run \
                 for connectivity
                 {optional} | [represents columns in connectivity matrix]
 
+<<roi>>     filename of a given ROI volume mask to use in given container call
+                {optional} | [only used in parallelized container calls]
+
+<<connectome>>  boolean whether to only perform combination of single weight files
+                into a single connectome.
+                {optional} | [default="only"; only used in parallelized container calls]
+
+<<preproc>>     boolean whether to only perform preprocessing to enable downstream parallalization.
+                {optional} | [default="only"; only used in parallelized container calls]
+
 <<template>>    template tractogram in same space as <seed> and <target>.
                 {optional} | [default: dTOR_full_tractogram.tck (Elias et al. (2024))]
-
-<<preproc>>     boolean whether to perform preprocessing as required for
-                single seed ROI connectivity computations. Has to be set to "only" once before
-                running single ROI connectivity computations
-                {optional} | [default: True]
 
 <<cleanup>>     boolean whether to remove temporary files
                 {optional} | [default: True >> removing temp-directory]
@@ -109,16 +116,19 @@ log_msg() {
     fi
 }
 
-# 3. check_variable
 
-check_variable() {
-    # check if given variable exists in environment
-    # else return error code 1
-    if [ -z "${1}" ]; then
-        log_msg "ERROR:    variable ${1} not found in environment."
-        exit 1
-    fi
+# 3. get_list_size
+get_list_size() {
+    # return length of given ROI list
+    # ${1}: roi list
+    count=0
+    for r in ${target_list}; do
+        count=$((count+1))
+    done
+    export list_size=${count}
 }
+
+# 4. get_temp_dir
 
 get_temp_dir(){
 # create temporary directory
@@ -127,6 +137,7 @@ get_temp_dir(){
     mkdir ${TempDir}
 }
 
+# 5. progress_bar
 progress_bar() {
     # print a progress bar during loops
     # ${1} current iteration of loop
@@ -139,13 +150,3 @@ progress_bar() {
     printf "\rProgress : [${_fill// /#}${_empty// /-}] ${_progress}%%"
 }
 
-
-get_list_size() {
-    # return length of given ROI list
-    # ${1}: roi list
-    count=0
-    for r in ${target_list}; do
-        count=$((count+1))
-    done
-    export list_size=${count}
-}

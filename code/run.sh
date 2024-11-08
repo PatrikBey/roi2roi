@@ -12,20 +12,15 @@
 # * Bey, Patrik, Charité Universitätsmedizin Berlin, Berlin Institute of Health
 # 
 #
-# * last update: 2024.09.06
+# * last update: 2024.11.08
 #
 #
 #
 # ## Description
 #
 # This script extractes ROI based tractograms from the template normative connectome (1) 
-# using ROI volume masks. If one ROI mask is provided all tracks intersecting the given 
-# ROI are extracted. If multiple ROI masks are provided all tracks intersecting with all ROI masks
-# are returned.
+# using ROI volume masks. 
 #
-# * steps within this script:
-# * preprocessing of
-# * 1. subsetting existing template tractogram
 #
 # REQUIREMENTS: 
 # 1. ROI2ROI docker container [or quivalent]
@@ -229,7 +224,6 @@ fi
 if [[ ${connectome,,} = "true" ]] || [[ ${connectome,,} = "only" ]]; then
     log_msg "START | combining ROI weights."
     # ---- combine weights of all ROI 2 ROI pairings
-    # combine_weights ${Path}/${seed}/weights_${target} ${Path}/Connectomes/${seed}_${target}_weights.tsv
     get_connectome ${seed} ${target}
     log_msg "FINISHED | combining ROI weights."
 fi
