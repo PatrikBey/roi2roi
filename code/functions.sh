@@ -59,6 +59,24 @@ get_tract_subset() {
         -include ${1}
 }
 
+get_tract_pair() {
+    # extract subset of tracts
+    # for given seed:target ROI pair
+    # $1 = seed ROI filename
+    # $2 = target ROI filename
+    # $3 = target tract subset
+    # $4 = output filename
+    tckedit -force -quiet \
+        ${3} \
+        "${TempDir}/tmp.tck" \
+        -include ${2}
+    tckedit -force -quiet \
+        "${TempDir}/tmp.tck" \
+        "${4}" \
+        -include ${1}
+
+}
+
 get_lookup_table() {
     # create look-up table for given set of ROIs
     # as integrated in connectivity matrix
@@ -131,6 +149,22 @@ get_strength(){
 }
 
 
+get_connection_length(){
+    # $1 input track file (i.e. normative tractogram)
+    # $2 parcellation image (i.e. atlas parcellation)
+    # $3 output filename
+    if [ -z ${3} ]; then
+        outfile="${2%.nii.gz}_lengths.tsv"
+    else
+        outfile="${3}"
+    fi
+    tck2connectome -scale_length -quiet -force -zero_diagonal -symmetric -stat_edge mean \
+        "${1}" \
+        "${2}" \
+        "${3}"
+}
+
+
 # combine_weights() {
 #     # create concatenated connectivity matrix for all ROIs
 #     #
@@ -167,7 +201,7 @@ get_connectome() {
     for r in ${roi_list}; do
         echo ${r%.nii.gz} >> ${TempDir}/seed.txt
     done
-
+    touch ${Path}/Connectomes/${1}_${2}_weights.tsv
     paste ${TempDir}/seed.txt ${TempDir}/weights_transpose.tsv > ${Path}/Connectomes/${1}_${2}_weights.tsv
 
     rm -r ${TempDir}

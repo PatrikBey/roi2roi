@@ -59,35 +59,56 @@ docker run \
 
 --- variables ---
 
-<<seed>>   name of set of ROIs to use as initial ROIs for connectivity
-                {required} | [represents rows in conenctivity matrix]
+<<seed>>        name of set of ROIs to use as initial ROIs for connectivity
+                    {required} | [represents rows in conenctivity matrix]
 
-<<target>> name of set of ROIs to use as secondary ROIs 
+<<target>>      name of set of ROIs to use as secondary ROIs 
                 for connectivity
-                {optional} | [represents columns in connectivity matrix]
+                    {optional} | [represents columns in connectivity matrix]
+
+<<tracts>>      boolean whether to extract subtracts for all seed:target ROI pairs
+                    {optional} | [default="False"; increases computation time]
+
+<<masks>>       boolean whether to only prepare seed & target masks for a given atlas
+                    {optional} | [default="False"; requires <<atlas>> to be set]
+
+<<atlas>>       Atlas name as provided in STUDYFOLDER for use in mask preparation
+                    {optional} | [default=MAPA; only used if <<masks>> = True]
+
+<<OutDir>>      Output directory for mask preparation step
+                    {optional} | [will contain seed/target roi_masks directories]
 
 <<roi>>     filename of a given ROI volume mask to use in given container call
                 {optional} | [only used in parallelized container calls]
 
-<<connectome>>  boolean whether to only perform combination of single weight files
+<<connectome>>      boolean whether to only perform combination of single weight files
                 into a single connectome.
-                {optional} | [default="only"; only used in parallelized container calls]
+                        {optional} | [default="only"; only used in parallelized container calls]
 
 <<preproc>>     boolean whether to only perform preprocessing to enable downstream parallalization.
-                {optional} | [default="only"; only used in parallelized container calls]
+                    {optional} | [default="only"; only used in parallelized container calls]
 
-<<template>>    template tractogram in same space as <seed> and <target>.
-                {optional} | [default: dTOR_full_tractogram.tck (Elias et al. (2024))]
+<<template>>        template tractogram in same space as <seed> and <target>.
+                        {optional} | [default: dTOR_full_tractogram.tck (Elias et al. (2024))]
 
-<<cleanup>>     boolean whether to remove temporary files
-                {optional} | [default: True >> removing temp-directory]
+<<cleanup>>         boolean whether to remove temporary files
+                        {optional} | [default: True >> removing temp-directory]
 
-<<CLUSTER>>     boolean whether container is run on HPC cluster to adjust logging functions.
-                {optional} | [default: False >> ussing color coded logging]
+<<CLUSTER>>         boolean whether container is run on HPC cluster to adjust logging functions.
+                        {optional} | [default: False >> ussing color coded logging]
 
 --- input ---
 
-expected input file structure:
+expected input file structure for mask preparation:
+
+/STUDYFOLDER
+    |_<<ATLASNAME>>
+        |_lut.tsv
+        |_<<ATLASNAME>>_MNI152.nii.gz
+
+
+expected input file structure for connectivity extraction:
+[created during mask preparation]
 
 /STUDYFOLDER
     |_seed

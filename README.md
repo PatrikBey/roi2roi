@@ -11,6 +11,15 @@ Patrik Bey, <a href="https://github.com/PatrikBey" target="_blank">Patrik Bey</a
 
 ## DESCRIPTION
 
+The corresponding docker container can be accessed on <a href="https://hub.docker.com/r/patrikneuro/roi2roi">dockerhub</a>
+
+
+```bash
+
+docker pull patrikneuro/roi2roi
+
+```
+
 ### REQUIREMENTS
 Certain data formating requirements exist for the automated usage:
 1. For each ROI list binary ROI volume masks need to be provided.

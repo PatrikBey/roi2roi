@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #
-# # get_tracts.sh
+# # run.sh
 #
 #
 # * Brain Simulation Section
@@ -58,6 +58,25 @@ if [[ -z ${target} ]]; then
     show_usage
 fi
 
+if [[ ! -z ${tracts} ]];then
+    log_msg "UPDATE | performing tract extraction for all ROI pairs."
+fi
+
+if [[ ! -z ${masks} ]]; then
+    log_msg "UPDATE | Only running mask preparations"
+    if [[ -z ${atlas} ]]; then
+        log_msg "ERROR |  Atlas name required for mask preparation."
+        show_usage
+    fi
+fi
+
+if [[ ! -d "${Path}/Connectomes" ]]; then
+    mkdir -p "${Path}/Connectomes"
+fi
+
+if [[ ! -d "${Path}/tracts" ]]; then
+    mkdir -p "${Path}/tracts"
+fi
 
 if [[ ! -z ${roi} ]] && [[ -f "${Path}/${seed}/roi_masks/${roi}" ]]; then
     log_msg "UPDATE | performing single seed ROI connectivity extraction."
@@ -108,8 +127,45 @@ fi
 #                                           #
 #############################################
 
+# ---- PREPARING ROI MASKS ---- #
+if [[ ${masks,,} = "true" ]]; then
+    log_msg "START | Preparing ROI masks"
+
+    python ${SRCDIR}/wrapper.py --path=${Path} --seed=${seed} --target=${target} --atlas=${atlas} --outdir=${OutDir}
+
+    log_msg "FINISHED | Preparing ROI masks"
+    exit 0
+fi
+
+# ---- COMPUTING TRACT LENGTHS ---- #
+
+if [[ ! -f "${Path}/${atlas}/${atlas}_tract_lengths.tsv" ]]; then
+    log_msg "START | Extracting ROI connection lengths."
+
+    if [[ -f "${Path}/${atlas}/${atlas}_mrtrix3.nii.gz" ]]; then
+        parc_image="${Path}/${atlas}/${atlas}_mrtrix3.nii.gz"
+    else
+        parc_image="${Path}/${atlas}/${atlas}_MNI152.nii.gz"
+    fi
+
+    get_connection_length \
+        "${TEMPLATEDIR}/dTOR_full_tractogram.tck" \
+        "${parc_image}" \
+        "${Path}/${atlas}/${atlas}_tract_lengths.tsv"
+    
+    missing=$(python -c "import numpy; empty=numpy.where(numpy.genfromtxt('${Path}/${atlas}/${atlas}_tract_lengths.tsv').sum(axis=0)==0)[0]+1; print(f'No tracts found for ROIs: {empty}.')")
+
+    if [[ ! ${missing} = "No tracts found for ROIs: []." ]]; then
+        log_msg "WARNING | ${missing}"
+    fi
+
+    log_msg "FINISHED | Extracting ROI connection lengths."
+
+fi
 
 
+
+# ---- EXTRACTING ROI MASKS BASED CONNECTIONS ---- #
 if [[ ${preproc,,} = "true" ]] || [[ ${preproc,,} = "only" ]] && [[ ! ${connectome,,} = "only" ]]; then
 
     log_msg "START | Preprocessing of ${seed} and ${target}"
@@ -121,12 +177,12 @@ if [[ ${preproc,,} = "true" ]] || [[ ${preproc,,} = "only" ]] && [[ ! ${connecto
     # ---- extract look-up tables for both ROI lists ---- #
     if [[ ! -f "${Path}/${seed}/LUT.txt" ]]; then
         log_msg "UPDATE | compute look-up table for ${seed}"
-        get_lookup_table /data/${seed}
+        get_lookup_table ${Path}/${seed}
     fi
 
     if [[ ! -f "${Path}/${target}/LUT.txt" ]]; then
         log_msg "UPDATE | compute look-up table for ${target}"
-        get_lookup_table /data/${target}
+        get_lookup_table ${Path}/${target}
     fi
 
 
@@ -158,6 +214,9 @@ fi
 #                                           #
 #############################################
 
+
+
+# initial implementation
 
 # ---- start connectivity computation ---- #
 
@@ -200,12 +259,15 @@ if [[ ! ${preproc,,} = "only" ]] && [[ ! ${connectome,,} = "only" ]]; then
             mkdir -p "${Path}/${seed}/weights_${target}"
         fi
         log_msg "UPDATE | extract connectivity for seed ROI $( basename ${roi_seed%.nii.gz})"
-        touch ${TempDir}/$( basename ${seed%.nii.gz})_weights.tsv
+        touch ${TempDir}/$( basename ${roi_seed%.nii.gz})_weights.tsv
         count=1
         for roi_target in ${target_list}; do
             get_assignments "${roi_seed}" "${roi_target}" "${tck}"
             get_strength ${TempDir}/weights/$( basename ${roi_target%.nii.gz}_weights.tsv)
             echo ${strength} >> ${TempDir}/$( basename ${roi_seed%.nii.gz})_weights.tsv
+            if [[ ! -z ${tracts} ]]; then
+                get_tract_pair $roi_seed $roi_target $tck ${Path}/tracts/$(basename ${roi_seed%.nii.gz})-$(basename ${roi_target%.nii.gz}).tck
+            fi
             progress_bar ${count} ${list_size}
             count=$((count+1))
         done
@@ -218,9 +280,6 @@ if [[ ! ${preproc,,} = "only" ]] && [[ ! ${connectome,,} = "only" ]]; then
 fi
 
 
-
-
-
 if [[ ${connectome,,} = "true" ]] || [[ ${connectome,,} = "only" ]]; then
     log_msg "START | combining ROI weights."
     # ---- combine weights of all ROI 2 ROI pairings
@@ -229,10 +288,10 @@ if [[ ${connectome,,} = "true" ]] || [[ ${connectome,,} = "only" ]]; then
 fi
 
 
-# ---- clean up of temporary files ---- #
-if [[ ${cleanup,,} = "true" ]]; then
-    if [[ -d ${TempDir} ]]; then
-        rm -r ${TempDir}
-        log_msg "FINISHED | Performing clean-up of temporary directory"
-    fi
-fi
+# # ---- clean up of temporary files ---- #
+# if [[ ${cleanup,,} = "true" ]]; then
+#     if [[ -d ${TempDir} ]]; then
+#         rm -r ${TempDir}
+#         log_msg "FINISHED | Performing clean-up of temporary directory"
+#     fi
+# fi
