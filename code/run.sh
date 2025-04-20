@@ -38,6 +38,9 @@
 source ${SRCDIR}/utils.sh
 source ${SRCDIR}/functions.sh
 
+figlet "ROI2ROI" | lolcat 
+
+log_msg "START | ROI2ROI connectivity builder |"
 # ---- parse input variables ---- #
 
 if [[ ! -d "/data" ]]; then
@@ -52,41 +55,45 @@ if [[ -z ${seed} ]]; then
     show_usage
 fi
 
+if [[ -f ${seed} ]]; then
+    log_msg "UPDATE | using $( basename ${seed}) as single seed region"
+    singleseed="TRUE"
+fi
 
 if [[ -z ${target} ]]; then
     log_msg "ERROR | no <<target>> variable defined."
     show_usage
 fi
 
-if [[ ! -z ${tracts} ]];then
-    log_msg "UPDATE | performing tract extraction for all ROI pairs."
-fi
+# if [[ ! -z ${tracts} ]];then
+#     log_msg "UPDATE | performing tract extraction for all ROI pairs."
+# fi
 
-if [[ ! -z ${masks} ]]; then
-    log_msg "UPDATE | Only running mask preparations"
-    if [[ -z ${atlas} ]]; then
-        log_msg "ERROR |  Atlas name required for mask preparation."
-        show_usage
-    fi
-fi
+# if [[ ! -z ${masks} ]]; then
+#     log_msg "UPDATE | Only running mask preparations"
+#     if [[ -z ${atlas} ]]; then
+#         log_msg "ERROR |  Atlas name required for mask preparation."
+#         show_usage
+#     fi
+# fi
 
-if [[ ! -d "${Path}/Connectomes" ]]; then
-    mkdir -p "${Path}/Connectomes"
-fi
+# if [[ ! -d "${Path}/Connectomes" ]]; then
+#     mkdir -p "${Path}/Connectomes"
+# fi
 
-if [[ ! -d "${Path}/tracts" ]]; then
-    mkdir -p "${Path}/tracts"
-fi
+# if [[ ! -d "${Path}/tracts" ]]; then
+#     mkdir -p "${Path}/tracts"
+# fi
 
-if [[ ! -z ${roi} ]] && [[ -f "${Path}/${seed}/roi_masks/${roi}" ]]; then
-    log_msg "UPDATE | performing single seed ROI connectivity extraction."
-    roi_mode="single"
-else
-    roi_mode="full"
-    if [[ -z ${connectome} ]]; then
-        connectome="true"
-    fi
-fi
+# if [[ ! -z ${roi} ]] && [[ -f "${Path}/${seed}/roi_masks/${roi}" ]]; then
+#     log_msg "UPDATE | performing single seed ROI connectivity extraction."
+#     roi_mode="single"
+# else
+#     roi_mode="full"
+#     if [[ -z ${connectome} ]]; then
+#         connectome="true"
+#     fi
+# fi
 
 
 if [[ -z ${template} ]]; then
@@ -97,29 +104,29 @@ elif [[ ! -f ${template} ]]; then
 fi
 
 
-if [[ "${roi_mode}"="full" ]]; then
-    if [ -z "${preproc}" ]; then
-        preproc="true"
-    fi
-elif [[ "${roi_mode}"="single" ]]; then
-    if [[ ${preproc,,}="only" ]]; then
-        log_msg "UPDATE | Only performing preprocessing of seed and target files for downstream connectivity analysis."
-    elif [[ ! ${preproc,,} = "true" ]] && [[ ! -f "${Path}/${target}/LUT.txt" ]] || [[ ! -f "${Path}/${target}/${target}.tck" ]] || [[ ! -f "${Path}/${target}/${target}_full_mask.nii.gz" ]]; then
-        log_msg "ERROR | no preprocessing results found."
-        show_usage
-    fi
-else
-    log_msg "ERROR | can't find corresponding ROI seed file/directory."
-    show_usage
-fi
+# if [[ "${roi_mode}"="full" ]]; then
+#     if [ -z "${preproc}" ]; then
+#         preproc="true"
+#     fi
+# elif [[ "${roi_mode}"="single" ]]; then
+#     if [[ ${preproc,,}="only" ]]; then
+#         log_msg "UPDATE | Only performing preprocessing of seed and target files for downstream connectivity analysis."
+#     elif [[ ! ${preproc,,} = "true" ]] && [[ ! -f "${Path}/${target}/LUT.txt" ]] || [[ ! -f "${Path}/${target}/${target}.tck" ]] || [[ ! -f "${Path}/${target}/${target}_full_mask.nii.gz" ]]; then
+#         log_msg "ERROR | no preprocessing results found."
+#         show_usage
+#     fi
+# else
+#     log_msg "ERROR | can't find corresponding ROI seed file/directory."
+#     show_usage
+# fi
 
 if [[ -z ${CLUSTER} ]]; then
     CLUSTER="FALSE"
 fi
 
-if [[ ! ${cleanup,,} = "false" ]] ; then
-    cleanup="true"
-fi
+# if [[ ! ${cleanup,,} = "false" ]] ; then
+#     cleanup="true"
+# fi
 
 #############################################
 #                                           #
@@ -128,14 +135,11 @@ fi
 #############################################
 
 # ---- PREPARING ROI MASKS ---- #
-if [[ ${masks,,} = "true" ]]; then
-    log_msg "START | Preparing ROI masks"
+log_msg "START | Preparing ROI masks"
 
-    python ${SRCDIR}/wrapper.py --path=${Path} --seed=${seed} --target=${target} --atlas=${atlas} --outdir=${OutDir}
+python ${SRCDIR}/wrapper.py --path=${Path} --seed=${seed} --target=${target} --atlas=${atlas} --outdir=${OutDir}
 
-    log_msg "FINISHED | Preparing ROI masks"
-    exit 0
-fi
+log_msg "FINISHED | Preparing ROI masks"
 
 # ---- COMPUTING TRACT LENGTHS ---- #
 
@@ -155,6 +159,8 @@ if [[ ! -f "${Path}/${atlas}/${atlas}_tract_lengths.tsv" ]]; then
     
     missing=$(python -c "import numpy; empty=numpy.where(numpy.genfromtxt('${Path}/${atlas}/${atlas}_tract_lengths.tsv').sum(axis=0)==0)[0]+1; print(f'No tracts found for ROIs: {empty}.')")
 
+    python -c "import numpy, matplotlib.pyplot as plt; tmp=numpy.genfromtxt('${Path}/${atlas}/${atlas}_tract_lengths.tsv'); plt.imshow(tmp); plt.colorbar(); plt.title('${atlas} connection lengths'); plt.savefig('${Path}/${atlas}/${atlas}_connection_lengths.png')"
+
     if [[ ! ${missing} = "No tracts found for ROIs: []." ]]; then
         log_msg "WARNING | ${missing}"
     fi
@@ -165,47 +171,42 @@ fi
 
 
 
-# ---- EXTRACTING ROI MASKS BASED CONNECTIONS ---- #
-if [[ ${preproc,,} = "true" ]] || [[ ${preproc,,} = "only" ]] && [[ ! ${connectome,,} = "only" ]]; then
-
-    log_msg "START | Preprocessing of ${seed} and ${target}"
-
-    # ---- initialize workspace ---- #
-    get_temp_dir ${Path}
+#############################################
+#                                           #
+#               CONNECTOMICS                #
+#                                           #
+#############################################
 
 
-    # ---- extract look-up tables for both ROI lists ---- #
-    if [[ ! -f "${Path}/${seed}/LUT.txt" ]]; then
-        log_msg "UPDATE | compute look-up table for ${seed}"
-        get_lookup_table ${Path}/${seed}
-    fi
-
-    if [[ ! -f "${Path}/${target}/LUT.txt" ]]; then
-        log_msg "UPDATE | compute look-up table for ${target}"
-        get_lookup_table ${Path}/${target}
-    fi
+if [[ ${singleseed} = "TRUE" ]]; then
+    log_msg "START | extracting single seed ROI sub-connectome."
+    '''
+    EXTRACTING DISCONNECTOME FOR GIVEN SING ROI
+    '''
 
 
-    # ---- create binary mask of all target ROIs ---- #
-    if [[ ! -f "${Path}/${target}/${target}_full_mask.nii.gz" ]]; then
-        log_msg "UPDATE | create target ROIs binary mask for tract reduction."
-        get_binary_volume ${target}
-        cp ${TempDir}/${target}_ribbon_bin.nii.gz ${Path}/${target}/${target}_full_mask.nii.gz
-    fi
+else
 
-    # ---- reduced normative tractogram ---- #
-    if [[ ! -f "${Path}/${target}/${target}.tck" ]]; then
-        log_msg "UPDATE | extracting target ROI tract subset."
-        get_tract_subset ${Path}/${target}/${target}_full_mask.nii.gz ${template}
-    fi
-    # ---- removing temporary directory and files ---- #
-    rm -r ${TempDir}
+    '''
 
-    log_msg "FINISHED | Preprocessing of ${seed} and ${target}"
-    if [[ ${preproc,,} = "only" ]]; then
-        exit 0
-    fi
+    '''
+    log_msg "START | Extract ROI pair connectivities."
+
+
+    ${SRCDIR}/get_roi_connectivities.sh \
+        --path="${Path}" \
+        --tck="${template}" \
+        --atlas="${atlas}" \
+        --outdir="${OutDir}"
+
 fi
+
+# ---- EXTRACTING ROI MASKS BASED CONNECTIONS ---- #
+# if [[ ${preproc,,} = "true" ]] || [[ ${preproc,,} = "only" ]] && [[ ! ${connectome,,} = "only" ]]; then
+
+log_msg "START | Extracting connections for ${seed} and ${target}"
+
+
 
 
 #############################################
@@ -295,3 +296,10 @@ fi
 #         log_msg "FINISHED | Performing clean-up of temporary directory"
 #     fi
 # fi
+
+
+
+
+
+
+log_msg "FINISHED | ROI2ROI connectivity builder |"

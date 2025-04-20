@@ -1,9 +1,3 @@
-
-
-
-
-
-
 # 20250326 UPDATE MAPA
 #
 #
@@ -120,9 +114,9 @@ def get_mrtrix_compatibility(img):
 
 parser = argparse.ArgumentParser(description='PREPARE SEED/TARGET MASKS')
 parser.add_argument("--path", help='Define input directory.', type=str, default = '/data')
-parser.add_argument("--atlas", help='Define atlas name.', type=str, default = 'MAPA')
-parser.add_argument("--seed", help='Define <<seed>> ROIs.', type=str, default = '3b, PF')
-parser.add_argument("--target", help='Define <<target>> ROIs.', type=str, default = 'occipital cortex')
+parser.add_argument("--atlas", help='Define atlas name.', type=str, default = 'AAL3')
+parser.add_argument("--seed", help='Define <<seed>> ROIs.', type=str, default = 'Insula_L,Occipital_Mid_L')
+parser.add_argument("--target", help='Define <<target>> ROIs.', type=str, default = 'Amygdala_R')
 parser.add_argument("--outdir", help='Define <<output directory>>.', type=str, default = None)
 
 args = parser.parse_args()
@@ -140,9 +134,8 @@ else:
 # ---- create output directories ---- #
 if not os.path.isdir(outdir):
     os.makedirs(outdir)
-
-os.makedirs(os.path.join(outdir, 'seed/roi_masks'))
-os.makedirs(os.path.join(outdir, 'target/roi_masks'))
+    os.makedirs(os.path.join(outdir, 'seed/roi_masks'))
+    os.makedirs(os.path.join(outdir, 'target/roi_masks'))
 
 # ---- load look-up table ---- #
 lut = numpy.genfromtxt(os.path.join(args.path, args.atlas, 'lut.tsv'), dtype = str, delimiter = ';')
@@ -161,6 +154,7 @@ if not len(ids) == ids[-1].astype(int):
     parc_mrtrix, lut_mrtrix = get_mrtrix_compatibility(data)
     save_image(parc_mrtrix, os.path.join(args.path, args.atlas, f'{args.atlas}_mrtrix3.nii.gz'), affine)
     numpy.savetxt(os.path.join(args.path, args.atlas, 'lut_mrtrix3.tsv'), lut_mrtrix, delimiter = '\t', fmt ='%s')
+    data = parc_mrtrix.copy()
 
 
 # ---- define ROI variables  ---- #

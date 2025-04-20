@@ -46,36 +46,72 @@ get_roi_volume() {
         ${TempDir}/tmp-parc.nii.gz 2>/dev/null
 }
 
+get_connection_length(){
+    # $1 input track file (i.e. normative tractogram)
+    # $2 parcellation image (i.e. atlas parcellation)
+    # $3 output filename
+    if [ -z ${3} ]; then
+        outfile="${2%.nii.gz}_lengths.tsv"
+    else
+        outfile="${3}"
+    fi
+    tck2connectome -scale_length -quiet -force -zero_diagonal -symmetric -stat_edge mean \
+        "${1}" \
+        "${2}" \
+        "${3}"
+}
+
 get_tract_subset() {
     # extract subset of tracts using ROI mask
     # from default normative tractogram
     # $1 = ROI target full mask
     # $2 = base tractogram [optional]
-    roi=$(basename ${1%_full_mask.nii.gz})
-    wd=$( dirname ${1} )
+    roi=$(basename ${1%.nii.gz})
+    wd=$( dirname $( dirname ${1} ))
     tckedit -force -quiet \
         ${2} \
-        "${wd}/${roi}.tck" \
+        "${wd}/tracts/${roi}_subset.tck" \
         -include ${1}
 }
 
-get_tract_pair() {
-    # extract subset of tracts
-    # for given seed:target ROI pair
-    # $1 = seed ROI filename
-    # $2 = target ROI filename
-    # $3 = target tract subset
-    # $4 = output filename
-    tckedit -force -quiet \
-        ${3} \
-        "${TempDir}/tmp.tck" \
-        -include ${2}
-    tckedit -force -quiet \
-        "${TempDir}/tmp.tck" \
-        "${4}" \
-        -include ${1}
-
+get_pair_tract() {
+    # extract ROI pair
+    # tracts
+    # $1 seed ROI mask
+    # $2 target ROI mask
+    # $3 minimal tract length
+    # $4 maximum tract length
+    WD=$( dirname $( dirname $( dirname ${2})))
+    if [[ ! -d "${WD}/tracts" ]]; then
+        mkdir -p "${WD}/tracts"
+    fi
+    tckedit -force \
+        "${WD}/tracts/full_mask_subset.tck" \
+        -include ${1} \
+        -include ${2} \
+        -minlength ${3} \
+        -maxlength ${4} \
+        "${WD}/tracts/$(basename ${1%.nii.gz})-$( basename ${2%.nii.gz}).tck"    
 }
+
+
+# get_tract_pair() {
+#     # extract subset of tracts
+#     # for given seed:target ROI pair
+#     # $1 = seed ROI filename
+#     # $2 = target ROI filename
+#     # $3 = target tract subset
+#     # $4 = output filename
+#     tckedit -force -quiet \
+#         ${3} \
+#         "${TempDir}/tmp.tck" \
+#         -include ${2}
+#     tckedit -force -quiet \
+#         "${TempDir}/tmp.tck" \
+#         "${4}" \
+#         -include ${1}
+
+# }
 
 get_lookup_table() {
     # create look-up table for given set of ROIs
@@ -93,76 +129,78 @@ get_lookup_table() {
 }
 
 
+get_tract_range() {
+    # compute tract length ranges
+    # for given ROI pair
+    # $1 seed ROI name
+    # $2 target ROI name
+    # $3 path
+    # $4 atlas
+    ranges=$( python \
+        ${SRCDIR}/prepare_length_range.py \
+            --path=${3} \
+            --seed="${1}" \
+            --target="${2}" \
+            --atlas="${4}" \
+            --ratio="0.1" )
+    IFS=, read -r min_length max_length <<< ${ranges}
+}
+
 
 get_binary_volume() {
     # create a binary volume combining all ROIs
     # for reduction of normative tractogram to 
     # reduce computational cost
     #
-    # ${1}: Target ROIs
+    # ${1}: Target ROIs directory
     # ---- create initial empty volume
     cp ${TEMPLATEDIR}/Empty.nii.gz \
-    ${TempDir}/${1}_ribbon.nii.gz
+    ${TempDir}/target_ribbon.nii.gz
     # ---- concatenate ROI masks
-    files="${Path}/${1}/roi_masks/*.nii.gz"
+    files="${1}/roi_masks/*.nii.gz"
     for f in $files; do
-        fslmaths ${TempDir}/${1}_ribbon.nii.gz \
+        fslmaths ${TempDir}/target_ribbon.nii.gz \
             -add ${f} \
-            ${TempDir}/${1}_ribbon.nii.gz 2>/dev/null
+            ${TempDir}/target_ribbon.nii.gz 2>/dev/null
     done
     # ---- binarize volume
-    fslmaths ${TempDir}/${1}_ribbon.nii.gz \
+    fslmaths ${TempDir}/target_ribbon.nii.gz \
         -bin \
-        ${TempDir}/${1}_ribbon_bin.nii.gz
+        ${TempDir}/target_ribbon_bin.nii.gz
 }
 
-get_assignments() {
-    # extract tract assignments for given ROI2ROI combination
-    #
-    # ${1}: seed ROI
-    # ${2}: target ROI
-    # ${3}: tractogram file to use in computation
-    # ---- initialize directory
-    if [ ! -d "${TempDir}/assignments" ]; then
-        mkdir -p "${TempDir}/assignments"
-    fi
-    if [ ! -d "${TempDir}/weights" ]; then
-        mkdir -p "${TempDir}/weights"
-    fi
-    # ---- get individual parcellation volume
-    get_roi_volume ${1} ${2}
-    # ---- compute connectome
-    target_roi=$( basename ${2%.nii.gz})
-    tck2connectome -force -zero_diagonal -quiet \
-        "${3}" \
-        "${TempDir}/tmp-parc.nii.gz" \
-        "${TempDir}/weights/${target_roi}_weights.tsv" \
-        -out_assignment "${TempDir}/assignments/${target_roi}.csv" 2>/dev/null
-}
+# get_assignments() {
+#     # extract tract assignments for given ROI2ROI combination
+#     #
+#     # ${1}: seed ROI
+#     # ${2}: target ROI
+#     # ${3}: tractogram file to use in computation
+#     # ---- initialize directory
+#     if [ ! -d "${TempDir}/assignments" ]; then
+#         mkdir -p "${TempDir}/assignments"
+#     fi
+#     if [ ! -d "${TempDir}/weights" ]; then
+#         mkdir -p "${TempDir}/weights"
+#     fi
+#     # ---- get individual parcellation volume
+#     get_roi_volume ${1} ${2}
+#     # ---- compute connectome
+#     target_roi=$( basename ${2%.nii.gz})
+#     tck2connectome -force -zero_diagonal -quiet \
+#         "${3}" \
+#         "${TempDir}/tmp-parc.nii.gz" \
+#         "${TempDir}/weights/${target_roi}_weights.tsv" \
+#         -out_assignment "${TempDir}/assignments/${target_roi}.csv" 2>/dev/null
+# }
 
-get_strength(){
-    # extract connection strength for given ROI2ROI pairs
-    #
-    # ${1}: weight text files created by <get_assignments>
-    read -a arr < ${1}
-    export strength=$( echo ${arr[1]})
-}
+# get_strength(){
+#     # extract connection strength for given ROI2ROI pairs
+#     #
+#     # ${1}: weight text files created by <get_assignments>
+#     read -a arr < ${1}
+#     export strength=$( echo ${arr[1]})
+# }
 
-
-get_connection_length(){
-    # $1 input track file (i.e. normative tractogram)
-    # $2 parcellation image (i.e. atlas parcellation)
-    # $3 output filename
-    if [ -z ${3} ]; then
-        outfile="${2%.nii.gz}_lengths.tsv"
-    else
-        outfile="${3}"
-    fi
-    tck2connectome -scale_length -quiet -force -zero_diagonal -symmetric -stat_edge mean \
-        "${1}" \
-        "${2}" \
-        "${3}"
-}
 
 
 # combine_weights() {
@@ -177,33 +215,33 @@ get_connection_length(){
 
 
 
-get_connectome() {
-    # generate connectome from single ROI weight files
-    # ${1}: Seed ROI list name
-    # ${2}: Target ROI list name
-    get_temp_dir ${Path}
-    weight_files="${Path}/${1}/weights_${2}/*.tsv"
-    paste ${weight_files} > ${TempDir}/weights.tsv
-    roi_list=$( ls "${Path}/${2}/roi_masks" )
-    touch "${TempDir}/target.txt"
+# get_connectome() {
+#     # generate connectome from single ROI weight files
+#     # ${1}: Seed ROI list name
+#     # ${2}: Target ROI list name
+#     get_temp_dir ${Path}
+#     weight_files="${Path}/${1}/weights_${2}/*.tsv"
+#     paste ${weight_files} > ${TempDir}/weights.tsv
+#     roi_list=$( ls "${Path}/${2}/roi_masks" )
+#     touch "${TempDir}/target.txt"
 
-    for r in ${roi_list}; do
-        echo ${r%.nii.gz} >> ${TempDir}/target.txt
-    done
-    paste ${TempDir}/target.txt ${weight_files} > ${TempDir}/weights.tsv
+#     for r in ${roi_list}; do
+#         echo ${r%.nii.gz} >> ${TempDir}/target.txt
+#     done
+#     paste ${TempDir}/target.txt ${weight_files} > ${TempDir}/weights.tsv
 
-    python -c "import sys; print('\n'.join(' '.join(c) for c in zip(*(l.split() for l in sys.stdin.readlines() if l.strip()))))" < ${TempDir}/weights.tsv > ${TempDir}/weights_transpose.tsv
+#     python -c "import sys; print('\n'.join(' '.join(c) for c in zip(*(l.split() for l in sys.stdin.readlines() if l.strip()))))" < ${TempDir}/weights.tsv > ${TempDir}/weights_transpose.tsv
 
-    roi_list=$( ls "${Path}/${seed}/roi_masks" )
-    touch "${TempDir}/seed.txt"
-    echo "ROIs" > "${TempDir}/seed.txt"
+#     roi_list=$( ls "${Path}/${seed}/roi_masks" )
+#     touch "${TempDir}/seed.txt"
+#     echo "ROIs" > "${TempDir}/seed.txt"
 
-    for r in ${roi_list}; do
-        echo ${r%.nii.gz} >> ${TempDir}/seed.txt
-    done
-    touch ${Path}/Connectomes/${1}_${2}_weights.tsv
-    paste ${TempDir}/seed.txt ${TempDir}/weights_transpose.tsv > ${Path}/Connectomes/${1}_${2}_weights.tsv
+#     for r in ${roi_list}; do
+#         echo ${r%.nii.gz} >> ${TempDir}/seed.txt
+#     done
+#     touch ${Path}/Connectomes/${1}_${2}_weights.tsv
+#     paste ${TempDir}/seed.txt ${TempDir}/weights_transpose.tsv > ${Path}/Connectomes/${1}_${2}_weights.tsv
 
-    rm -r ${TempDir}
-}
+#     rm -r ${TempDir}
+# }
 

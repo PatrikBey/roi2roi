@@ -88,7 +88,7 @@ docker run \
 <<preproc>>     boolean whether to only perform preprocessing to enable downstream parallalization.
                     {optional} | [default="only"; only used in parallelized container calls]
 
-<<template>>        template tractogram in same space as <seed> and <target>.
+<<template>>        template tractogram in same space as <seed> and <target>. Path relative to /data
                         {optional} | [default: dTOR_full_tractogram.tck (Elias et al. (2024))]
 
 <<cleanup>>         boolean whether to remove temporary files
@@ -135,6 +135,18 @@ log_msg() {
             echo -e "\n$(date) $(basename  -- "$0") | ${_message}"
         fi
     fi
+}
+
+
+getopt1() {
+    sopt="$1"
+    shift 1
+    for fn in $@ ; do
+	if [ `echo $fn | grep -- "^${sopt}=" | wc -w` -gt 0 ] ; then
+	    echo $fn | sed "s/^${sopt}=//"
+	    return 0
+	fi
+    done
 }
 
 

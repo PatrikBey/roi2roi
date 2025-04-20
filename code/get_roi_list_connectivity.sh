@@ -42,6 +42,20 @@
 #############################################
 
 
+
+
+# create different connectivity scripts creating seed&target or only seed based tractogram subsets
+
+
+
+WD="${Path}/connectivity"
+
+
+if [[ ! -d "${WD}" ]]; then
+    mkdir -p "${WD}"
+    mkdir -p "${WD}/tracts"
+fi
+
 # ---- loading I/O & logging functionality ---- #
 source ${SRCDIR}/utils.sh
 source ${SRCDIR}/functions.sh
@@ -73,22 +87,77 @@ seed_list="${Path}/${seed}/roi_masks/*.nii.gz"
 target_list="${Path}/${target}/roi_masks/*.nii.gz"
 
 
+# ---- 1. create study parcellation subset ---- #
+
+cp "${TEMPLATEDIR}/Empty.nii.gz" "${WD}/parcellation_subset.nii.gz"
+
+touch "${WD}/LUT.txt"
+
+get_temp_dir ${WD}
+
+count=1
+for f in $seed_list; do
+    roi=$( basename ${f%.nii.gz})
+    fslmaths ${f} -mul ${count} ${TempDir}/tmp.nii.gz
+    fslmaths "${WD}/parcellation_subset.nii.gz" \
+        -add ${TempDir}/tmp.nii.gz \
+        "${WD}/parcellation_subset.nii.gz"
+    echo "${count},${roi}" >> "${WD}/lut.txt"
+    count=$((count+1))
+done
+
+for f in $target_list; do
+    roi=$( basename ${f%.nii.gz})
+    fslmaths ${f} -mul ${count} ${TempDir}/tmp.nii.gz
+    fslmaths "${WD}/parcellation_subset.nii.gz" \
+        -add ${TempDir}/tmp.nii.gz \
+        "${WD}/parcellation_subset.nii.gz"
+    echo "${count},${roi}" >> "${WD}/lut.txt"
+    count=$((count+1))
+done
+
+
+# ---- 2. create tract subset ---- #
+
+
+tckedit -force \
+    "${TEMPLATEDIR}/dTOR_full_tractogram.tck" \
+    "${WD}/tracts/full.tck" \
+    -include "${WD}/parcellation_subset.nii.gz"
 
 
 
+# ---- 3. get connection lengths ---- #
+get_connection_length "${WD}/tracts/full.tck" \
+     "${WD}/parcellation_subset.nii.gz" \
+     "${WD}/lengths.tsv"
+
+# ---- compute
+
+tckedit "${WD}/tracts/full.tck" \
+    -include /data/MAPA/run_8834/seed/roi_masks/3b.nii.gz \
+    -include /data/MAPA/run_8834/target/roi_masks/occipital_cortex.nii.gz \
+    -minlength 90 \
+    -maxlength 110 \
+    ${WD}/tracts/3b_occipital_cortext.tck
 
 
+get_tract_range() {
+    # compute tract length ranges
+    # for given ROI pair
+    # $1 seed ROI name
+    # $2 target ROI name
+    # $3 path
+    ranges=$( python \
+        ${SRCDIR}/prepare_length_range.py \
+            --path=${3} \
+            --seed="${1}" \
+            --target="${2}" \
+            --ratio="0.1" )
+    IFS=, read -r min_length max_length <<< ${ranges}
+}
 
-
-
-
-
-
-
-
-
-
-
+get_tract_range "PF" "occipital_cortex" ${WD}
 
 # ---- 0. compute length for each ROI pair ---- #
 
