@@ -60,8 +60,20 @@ if [[ -f ${seed} ]]; then
     singleseed="TRUE"
 fi
 
-if [[ -z ${target} ]]; then
+if [[ -z ${target} ]] && [[ -z ${singleseed} ]] ; then
     log_msg "ERROR | no <<target>> variable defined."
+    show_usage
+fi
+
+if [[ ${target,,}='brain' ]]; then
+    log_msg "UPDATE | extracting ${seed} to full brain connectivity."
+    singleseed="TRUE"
+fi
+if [[ -z ${atlas} ]]; then
+    log_msg "ERROR | no atlas defined."
+    show_usage
+elif [[ ! -d ${TEMPLATEDIR}/${atlas} ]] && [[ ! -d ${Path}/${atlas} ]]; then
+    log_msg "ERROR | no directory found for ${atlas}"
     show_usage
 fi
 
@@ -134,40 +146,7 @@ fi
 #                                           #
 #############################################
 
-# ---- PREPARING ROI MASKS ---- #
-log_msg "START | Preparing ROI masks"
 
-python ${SRCDIR}/wrapper.py --path=${Path} --seed=${seed} --target=${target} --atlas=${atlas} --outdir=${OutDir}
-
-log_msg "FINISHED | Preparing ROI masks"
-
-# ---- COMPUTING TRACT LENGTHS ---- #
-
-if [[ ! -f "${Path}/${atlas}/${atlas}_tract_lengths.tsv" ]]; then
-    log_msg "START | Extracting ROI connection lengths."
-
-    if [[ -f "${Path}/${atlas}/${atlas}_mrtrix3.nii.gz" ]]; then
-        parc_image="${Path}/${atlas}/${atlas}_mrtrix3.nii.gz"
-    else
-        parc_image="${Path}/${atlas}/${atlas}_MNI152.nii.gz"
-    fi
-
-    get_connection_length \
-        "${TEMPLATEDIR}/dTOR_full_tractogram.tck" \
-        "${parc_image}" \
-        "${Path}/${atlas}/${atlas}_tract_lengths.tsv"
-    
-    missing=$(python -c "import numpy; empty=numpy.where(numpy.genfromtxt('${Path}/${atlas}/${atlas}_tract_lengths.tsv').sum(axis=0)==0)[0]+1; print(f'No tracts found for ROIs: {empty}.')")
-
-    python -c "import numpy, matplotlib.pyplot as plt; tmp=numpy.genfromtxt('${Path}/${atlas}/${atlas}_tract_lengths.tsv'); plt.imshow(tmp); plt.colorbar(); plt.title('${atlas} connection lengths'); plt.savefig('${Path}/${atlas}/${atlas}_connection_lengths.png')"
-
-    if [[ ! ${missing} = "No tracts found for ROIs: []." ]]; then
-        log_msg "WARNING | ${missing}"
-    fi
-
-    log_msg "FINISHED | Extracting ROI connection lengths."
-
-fi
 
 
 
@@ -183,6 +162,15 @@ if [[ ${singleseed} = "TRUE" ]]; then
     '''
     EXTRACTING DISCONNECTOME FOR GIVEN SING ROI
     '''
+    python ${SRCDIR}/roi2brain_preproc.py --path=${Path} --seed=${seed} --atlas=${atlas} --outdir=${OutDir}
+
+    
+    ${SRCDIR}/get_roi2brain_connect.sh \
+        --path="${Path}" \
+        --seed="${seed}" \
+        --atlas="${atlas}" \
+        --tck="${template}" \
+        --outdir="${OutDir}"
 
 
 else
@@ -192,19 +180,49 @@ else
     '''
     log_msg "START | Extract ROI pair connectivities."
 
+    # ---- PREPARING ROI MASKS ---- #
+    log_msg "START | Preparing ROI masks"
 
-    ${SRCDIR}/get_roi_connectivities.sh \
+    python ${SRCDIR}/roi2roi_preproc.py --path=${Path} --seed=${seed} --target=${target} --atlas=${atlas} --outdir=${OutDir}
+
+    log_msg "FINISHED | Preparing ROI masks"
+
+    # ---- COMPUTING TRACT LENGTHS ---- #
+
+    if [[ ! -f "${Path}/${atlas}/${atlas}_tract_lengths.tsv" ]]; then
+        log_msg "START | Extracting ROI connection lengths."
+
+        if [[ -f "${Path}/${atlas}/${atlas}_mrtrix3.nii.gz" ]]; then
+            parc_image="${Path}/${atlas}/${atlas}_mrtrix3.nii.gz"
+        else
+            parc_image="${Path}/${atlas}/${atlas}_MNI152.nii.gz"
+        fi
+
+        get_connection_length \
+            "${TEMPLATEDIR}/dTOR_full_tractogram.tck" \
+            "${parc_image}" \
+            "${Path}/${atlas}/${atlas}_tract_lengths.tsv"
+        
+        missing=$(python -c "import numpy; empty=numpy.where(numpy.genfromtxt('${Path}/${atlas}/${atlas}_tract_lengths.tsv').sum(axis=0)==0)[0]+1; print(f'No tracts found for ROIs: {empty}.')")
+
+        python -c "import numpy, matplotlib.pyplot as plt; tmp=numpy.genfromtxt('${Path}/${atlas}/${atlas}_tract_lengths.tsv'); plt.imshow(tmp); plt.colorbar(); plt.title('${atlas} connection lengths'); plt.savefig('${Path}/${atlas}/${atlas}_connection_lengths.png')"
+
+        if [[ ! ${missing} = "No tracts found for ROIs: []." ]]; then
+            log_msg "WARNING | ${missing}"
+        fi
+
+        log_msg "FINISHED | Extracting ROI connection lengths."
+
+    fi
+
+    ${SRCDIR}/get_roi2roi_connect.sh \
         --path="${Path}" \
         --tck="${template}" \
         --atlas="${atlas}" \
         --outdir="${OutDir}"
 
+    log_msg "FINISHED | Extract ROI pair connectivities."
 fi
-
-# ---- EXTRACTING ROI MASKS BASED CONNECTIONS ---- #
-# if [[ ${preproc,,} = "true" ]] || [[ ${preproc,,} = "only" ]] && [[ ! ${connectome,,} = "only" ]]; then
-
-log_msg "START | Extracting connections for ${seed} and ${target}"
 
 
 
@@ -217,85 +235,85 @@ log_msg "START | Extracting connections for ${seed} and ${target}"
 
 
 
-# initial implementation
+# # initial implementation
 
-# ---- start connectivity computation ---- #
+# # ---- start connectivity computation ---- #
 
-if [[ ! ${preproc,,} = "only" ]] && [[ ! ${connectome,,} = "only" ]]; then
+# if [[ ! ${preproc,,} = "only" ]] && [[ ! ${connectome,,} = "only" ]]; then
 
-    if [[ ! -z ${roi} ]]; then
-        seed_name=${roi}
-    else
-        seed_name=${seed}
-    fi
-
-    log_msg "START | Computing connectivity for ${seed_name} and ${target}" 
-
-
-    # ---- prepare variables ---- #
-    tck="${Path}/${target}/${target}.tck"
-
-    target_list="${Path}/${target}/roi_masks/*.nii.gz"
-    get_list_size ${target_list}
-
-
-    if [[ ${roi_mode} = "full" ]]; then
-        seed_list="${Path}/${seed}/roi_masks/*.nii.gz"
-        seed_roi_name=${seed}
-    else 
-        seed_list="${Path}/${seed}/roi_masks/${roi%.nii.gz}.nii.gz"
-        seed_roi_name="${roi%.nii.gz}"
-    fi
-
-
-    # ---- initialize workspace ---- #
-    get_temp_dir ${Path}
-    log_msg "UPDATE | Creating temporary directory ${TempDir}"
-
-    # --- loop over all ROI 2 ROI pairings
-
-
-    for roi_seed in ${seed_list}; do
-        if [ ! -d "${Path}/${seed}/weights_${target}" ]; then
-            mkdir -p "${Path}/${seed}/weights_${target}"
-        fi
-        log_msg "UPDATE | extract connectivity for seed ROI $( basename ${roi_seed%.nii.gz})"
-        touch ${TempDir}/$( basename ${roi_seed%.nii.gz})_weights.tsv
-        count=1
-        for roi_target in ${target_list}; do
-            get_assignments "${roi_seed}" "${roi_target}" "${tck}"
-            get_strength ${TempDir}/weights/$( basename ${roi_target%.nii.gz}_weights.tsv)
-            echo ${strength} >> ${TempDir}/$( basename ${roi_seed%.nii.gz})_weights.tsv
-            if [[ ! -z ${tracts} ]]; then
-                get_tract_pair $roi_seed $roi_target $tck ${Path}/tracts/$(basename ${roi_seed%.nii.gz})-$(basename ${roi_target%.nii.gz}).tck
-            fi
-            progress_bar ${count} ${list_size}
-            count=$((count+1))
-        done
-        cp ${TempDir}/$( basename ${roi_seed%.nii.gz})_weights.tsv \
-            ${Path}/${seed}/weights_${target}/$( basename ${roi_seed%.nii.gz})_${target}_weights.tsv
-    done
-
-    log_msg "FINISHED | Computing connectivity for ${seed_name} and ${target}"
-
-fi
-
-
-if [[ ${connectome,,} = "true" ]] || [[ ${connectome,,} = "only" ]]; then
-    log_msg "START | combining ROI weights."
-    # ---- combine weights of all ROI 2 ROI pairings
-    get_connectome ${seed} ${target}
-    log_msg "FINISHED | combining ROI weights."
-fi
-
-
-# # ---- clean up of temporary files ---- #
-# if [[ ${cleanup,,} = "true" ]]; then
-#     if [[ -d ${TempDir} ]]; then
-#         rm -r ${TempDir}
-#         log_msg "FINISHED | Performing clean-up of temporary directory"
+#     if [[ ! -z ${roi} ]]; then
+#         seed_name=${roi}
+#     else
+#         seed_name=${seed}
 #     fi
+
+#     log_msg "START | Computing connectivity for ${seed_name} and ${target}" 
+
+
+#     # ---- prepare variables ---- #
+#     tck="${Path}/${target}/${target}.tck"
+
+#     target_list="${Path}/${target}/roi_masks/*.nii.gz"
+#     get_list_size ${target_list}
+
+
+#     if [[ ${roi_mode} = "full" ]]; then
+#         seed_list="${Path}/${seed}/roi_masks/*.nii.gz"
+#         seed_roi_name=${seed}
+#     else 
+#         seed_list="${Path}/${seed}/roi_masks/${roi%.nii.gz}.nii.gz"
+#         seed_roi_name="${roi%.nii.gz}"
+#     fi
+
+
+#     # ---- initialize workspace ---- #
+#     get_temp_dir ${Path}
+#     log_msg "UPDATE | Creating temporary directory ${TempDir}"
+
+#     # --- loop over all ROI 2 ROI pairings
+
+
+#     for roi_seed in ${seed_list}; do
+#         if [ ! -d "${Path}/${seed}/weights_${target}" ]; then
+#             mkdir -p "${Path}/${seed}/weights_${target}"
+#         fi
+#         log_msg "UPDATE | extract connectivity for seed ROI $( basename ${roi_seed%.nii.gz})"
+#         touch ${TempDir}/$( basename ${roi_seed%.nii.gz})_weights.tsv
+#         count=1
+#         for roi_target in ${target_list}; do
+#             get_assignments "${roi_seed}" "${roi_target}" "${tck}"
+#             get_strength ${TempDir}/weights/$( basename ${roi_target%.nii.gz}_weights.tsv)
+#             echo ${strength} >> ${TempDir}/$( basename ${roi_seed%.nii.gz})_weights.tsv
+#             if [[ ! -z ${tracts} ]]; then
+#                 get_tract_pair $roi_seed $roi_target $tck ${Path}/tracts/$(basename ${roi_seed%.nii.gz})-$(basename ${roi_target%.nii.gz}).tck
+#             fi
+#             progress_bar ${count} ${list_size}
+#             count=$((count+1))
+#         done
+#         cp ${TempDir}/$( basename ${roi_seed%.nii.gz})_weights.tsv \
+#             ${Path}/${seed}/weights_${target}/$( basename ${roi_seed%.nii.gz})_${target}_weights.tsv
+#     done
+
+#     log_msg "FINISHED | Computing connectivity for ${seed_name} and ${target}"
+
 # fi
+
+
+# if [[ ${connectome,,} = "true" ]] || [[ ${connectome,,} = "only" ]]; then
+#     log_msg "START | combining ROI weights."
+#     # ---- combine weights of all ROI 2 ROI pairings
+#     get_connectome ${seed} ${target}
+#     log_msg "FINISHED | combining ROI weights."
+# fi
+
+
+# # # ---- clean up of temporary files ---- #
+# # if [[ ${cleanup,,} = "true" ]]; then
+# #     if [[ -d ${TempDir} ]]; then
+# #         rm -r ${TempDir}
+# #         log_msg "FINISHED | Performing clean-up of temporary directory"
+# #     fi
+# # fi
 
 
 

@@ -2,15 +2,24 @@
 
 docker run -it -v /mnt/h/Research/ROI2ROI/Data:/data roi2roi:dev bash
 
-atlas="AAL3"
-Path="/data"
-seed="Frontal_Sup_Medial_L,Cingulate_Ant_L,Cingulate_Post_L"
-target="Angular_L,Precuneus_L"
-OutDir="/data/AAL3DMNTEST"
+export atlas="MAPA"
 
+export Path="/data"
+export seed="Id8"
+# seed based
+# seed="/data/lesion_test.nii.gz"
+# roi based
+# export seed="Frontal_Sup_Medial_L"
+export target="brain"
+export OutDir="/data/MAPA-ROI2BRAIN-${seed}"
+
+
+$SRCDIR/run.sh 
 
 #####################
 # ISSUE: small connection can still include neighbouring tracts!!!!
+
+
 Atlas=$atlas
 TractFile=$template
 

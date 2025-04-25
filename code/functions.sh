@@ -85,7 +85,7 @@ get_pair_tract() {
     if [[ ! -d "${WD}/tracts" ]]; then
         mkdir -p "${WD}/tracts"
     fi
-    tckedit -force \
+    tckedit -force -quiet \
         "${WD}/tracts/full_mask_subset.tck" \
         -include ${1} \
         -include ${2} \
@@ -93,6 +93,34 @@ get_pair_tract() {
         -maxlength ${4} \
         "${WD}/tracts/$(basename ${1%.nii.gz})-$( basename ${2%.nii.gz}).tck"    
 }
+
+
+get_pair_parc() {
+    # create temporary parcellation volume for given
+    # ROI pair
+    # $1 input seed ROI name
+    # $2 input target ROI name
+    # $3 output directory
+    fslmaths ${3}/target/roi_masks/${2}.nii.gz \
+        -mul 2 \
+        ${3}/parcellations/${1}-${2}.nii.gz
+    fslmaths ${3}/parcellations/${1}-${2}.nii.gz \
+        -add ${3}/seed/roi_masks/${1}.nii.gz \
+        ${3}/parcellations/${1}-${2}.nii.gz
+}
+
+get_roi_weights() {
+    # compute connectivity weight
+    # for a given ROI pair
+    # $1 seed ROI name
+    # $2 target ROI name
+    # $3 working directory
+    tck2connectome -force -quiet \
+        "${3}/tracts/${1}-${2}.tck" \
+        "${3}/parcellations/${1}-${2}.nii.gz" \
+        "${3}/weights/${1}-${2}.tsv"
+}
+
 
 
 # get_tract_pair() {

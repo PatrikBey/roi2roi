@@ -183,3 +183,14 @@ progress_bar() {
     printf "\rProgress : [${_fill// /#}${_empty// /-}] ${_progress}%%"
 }
 
+
+
+# return length of a (single or multiple) given array
+
+get_array_len() {
+    # return length of provided input
+    # arrays
+    # $1:N arrays to count elements from
+    len=($( echo $#));
+}
+

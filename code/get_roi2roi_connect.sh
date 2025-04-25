@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #
-# # get_roi_connectivities.sh
+# # get_roi2roi_connect.sh
 #
 #
 # * Brain Simulation Section
@@ -40,6 +40,8 @@ OutDir=`getopt1 "--outdir" $@`  # "$4"output directory
 
 if [[ ! -d "${OutDir}/tracts" ]]; then
     mkdir -p "${OutDir}/tracts"
+    mkdir -p "${OutDir}/parcellations"
+    mkdir -p "${OutDir}/weights"
 fi
 
 #############################################
@@ -107,7 +109,7 @@ get_temp_dir ${OutDir}
 log_msg "UPDATE | Creating temporary directory ${TempDir}"
 
 
-cp "${TEMPLATEDIR}/Empty.nii.gz" "${OutDir}/parcellation_subset.nii.gz"
+cp "${TEMPLATEDIR}/Empty.nii.gz" "${OutDir}/parcellations/parcellation_subset.nii.gz"
 
 touch "${OutDir}/LUT.txt"
 
@@ -115,9 +117,9 @@ count=1
 for f in $seed_list; do
     roi=$( basename ${f%.nii.gz})
     fslmaths ${f} -mul ${count} ${TempDir}/tmp.nii.gz
-    fslmaths "${OutDir}/parcellation_subset.nii.gz" \
+    fslmaths "${OutDir}/parcellations/parcellation_subset.nii.gz" \
         -add ${TempDir}/tmp.nii.gz \
-        "${OutDir}/parcellation_subset.nii.gz"
+        "${OutDir}/parcellations/parcellation_subset.nii.gz"
     echo "${count},${roi}" >> "${OutDir}/lut.txt"
     count=$((count+1))
 done
@@ -125,29 +127,63 @@ done
 for f in $target_list; do
     roi=$( basename ${f%.nii.gz})
     fslmaths ${f} -mul ${count} ${TempDir}/tmp.nii.gz
-    fslmaths "${OutDir}/parcellation_subset.nii.gz" \
+    fslmaths "${OutDir}/parcellations/parcellation_subset.nii.gz" \
         -add ${TempDir}/tmp.nii.gz \
-        "${OutDir}/parcellation_subset.nii.gz"
+        "${OutDir}/parcellations/parcellation_subset.nii.gz"
     echo "${count},${roi}" >> "${OutDir}/lut.txt"
     count=$((count+1))
 done
 
 
 
-# --- loop over all ROI 2 ROI pairings
+# ---- loop over all ROI 2 ROI pairings ---- #
+log_msg "UPDATE | extracting pair wise parcellations & weights."
+# prepare progressbar
+count=1
+get_array_len ${seed_list}
+seed_count=${len}
+get_array_len ${target_list}
+target_count=${len}
+pair_count=$(( ${seed_count} * ${target_count} ))
 
 for seed_roi in ${seed_list}; do
     seed_roi_name=$( basename ${seed_roi%.nii.gz})
     for target_roi in ${target_list}; do
         target_roi_name=$( basename ${target_roi%.nii.gz})
-        get_tract_range $seed_roi_name $target_roi_name ${Path} ${Atlas}
-        get_pair_tract $seed_roi $target_roi $min_length $max_length
+        get_tract_range "${seed_roi_name}" "${target_roi_name}" "${Path}" "${Atlas}"
+        get_pair_tract "${seed_roi}" "${target_roi}" "${min_length}" "${max_length}"
+        get_pair_parc "${seed_roi_name}" "${target_roi_name}" "${OutDir}"
+        get_roi_weights "${seed_roi_name}" "${target_roi_name}" "${OutDir}"
+        progress_bar $count ${pair_count}
+        count=$((count+1))
     done
 done
+
+python ${SRCDIR}/combine_weights.py --path=${OutDir}
+
+# ---- clean up temporary directories ---- #
+rm -r ${TempDir}
+
 
 
 
 log_msg "FINISHED | Extracting ROI based connectivity."
+
+
+# ---- create tractogram for all ROIs ---- #
+
+# files="${OutDir}/tracts/*-*.tck"
+
+# tckedit ${files} \
+#     ${OutDir}/tracts/ROIs_subset.tck
+
+
+# log_msg "FINISHED | Extracting ROI based connectivity."
+
+# tck2connectome -force \
+#     ${OutDir}/tracts/ROIs_subset.tck \
+#     ${OutDir}/parcellation_subset.nii.gz \
+#     ${OutDir}/weights.tsv
 
 
 
@@ -157,4 +193,5 @@ log_msg "FINISHED | Extracting ROI based connectivity."
 #     get_connectome ${seed} ${target}
 #     log_msg "FINISHED | combining ROI weights."
 # fi
+
 
