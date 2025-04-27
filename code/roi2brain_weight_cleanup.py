@@ -63,22 +63,32 @@ def get_id(_roi, _grouping, _lut):
 
 
 parser = argparse.ArgumentParser(description=' ')
-parser.add_argument("--path", help='Define input directory.', type=str, default = '/data/MAPA-ROI2BRAIN-Id8')
-parser.add_argument("--roi", help='Define input seed ROI.', type=str, default = 'Id8')
-parser.add_argument("--atlas", help='define atlas used', type=str, default='MAPA')
+parser.add_argument("--path", help='Define input directory.', type=str, default = '/data/MAPA3-ROI2BRAIN-pOFC')
+parser.add_argument("--roi", help='Define input seed ROI.', type=str, default = 'pOFC')
+parser.add_argument("--atlas", help='define atlas used', type=str, default='MAPA3')
 args = parser.parse_args()
 
 log_msg('START | Combining ROI pair wise connection weights.')
 
-atlas = nibabel.load(os.path.join(os.path.dirname(args.path), args.atlas, f'{args.atlas}_MNI152.nii.gz'))
+# ---- load atlas parcellation ---- #
+if os.path.isfile(os.path.join(os.path.dirname(args.path), args.atlas, f'{args.atlas}_mrtrix3.nii.gz')):
+    atlas = nibabel.load(os.path.join(os.path.dirname(args.path), args.atlas, f'{args.atlas}_mrtrix3.nii.gz'))
+else:
+    atlas = nibabel.load(os.path.join(os.path.dirname(args.path), args.atlas, f'{args.atlas}_MNI152.nii.gz'))
+
 data = atlas.get_fdata()
+
+# ---- load atlas LUT ---- #
+if os.path.isdir(os.path.join(os.path.dirname(args.path), args.atlas, 'lut_mrtrix3.tsv')):
+    lut = numpy.genfromtxt(os.path.join(os.path.dirname(args.path), args.atlas, 'lut_mrtrix3.tsv'), dtype = str, delimiter = ';')
+else:
+    lut = numpy.genfromtxt(os.path.join(os.path.dirname(args.path), args.atlas, 'lut.tsv'), dtype = str, delimiter = ';')
+
 
 
 weight_file = os.path.join(args.path, 'weights', f'{args.roi}.tsv')
 
 weights = numpy.genfromtxt(weight_file)
-
-lut = numpy.genfromtxt(os.path.join(os.path.dirname(args.path), args.atlas, 'lut.tsv'), dtype = str, delimiter = ';')
 
 
 roiid = get_id(args.roi, check_grouping([args.roi], lut), lut)

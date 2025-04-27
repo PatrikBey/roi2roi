@@ -158,27 +158,36 @@ fi
 
 
 if [[ ${singleseed} = "TRUE" ]]; then
-    log_msg "START | extracting single seed ROI sub-connectome."
-    '''
-    EXTRACTING DISCONNECTOME FOR GIVEN SING ROI
-    '''
-    python ${SRCDIR}/roi2brain_preproc.py --path=${Path} --seed=${seed} --atlas=${atlas} --outdir=${OutDir}
 
-    
-    ${SRCDIR}/get_roi2brain_connect.sh \
-        --path="${Path}" \
-        --seed="${seed}" \
-        --atlas="${atlas}" \
-        --tck="${template}" \
-        --outdir="${OutDir}"
+    if [[ -f ${seed} ]]; then
 
+        log_msg "START | extracting volume mask based connectivity."
+
+
+
+    else
+
+        log_msg "START | extracting single seed ROI connectivity."
+        # '''
+        # EXTRACTING DISCONNECTOME FOR GIVEN SING ROI
+        # '''
+        python ${SRCDIR}/roi2brain_preproc.py --path=${Path} --seed=${seed} --atlas=${atlas} --outdir=${OutDir}
+
+        
+        ${SRCDIR}/get_roi2brain_connect.sh \
+            --path="${Path}" \
+            --seed="${seed}" \
+            --atlas="${atlas}" \
+            --tck="${template}" \
+            --outdir="${OutDir}"
+    fi
 
 else
 
     '''
 
     '''
-    log_msg "START | Extract ROI pair connectivities."
+    log_msg "START | Extract ROI pair(s) connectivities."
 
     # ---- PREPARING ROI MASKS ---- #
     log_msg "START | Preparing ROI masks"

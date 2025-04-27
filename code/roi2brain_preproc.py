@@ -71,12 +71,20 @@ def get_mrtrix_compatibility(img):
     out_lut[0,:] = ['id', 'raw_id']
     return(out_img, out_lut)
 
-def update_mrtrix_lut(_lut, _lut_mrtrix, _grouping):
+def update_mrtrix_lut(_lut, _ids):
     '''
     adjust the updated MRtrix3 compatible LUT
     with ROI names
     '''
-    numpy.concatenate([_lut_mrtrix.reshape(-1,2), _lut[:,grouping].reshape(-1,1)], axis = 0)
+    lut_update = _lut.copy()
+    lut_ids = list(_lut[:,0])
+    del_ids = []
+    for i in lut_ids[1:]:
+        if not float(i) in _ids:
+            del_ids.append(lut_ids.index(i))
+    lut_update = numpy.delete(lut_update, del_ids,axis = 0)
+    lut_update[1:,0] = numpy.arange(1,len(_ids)+1)
+    return(lut_update)
 
 
 
@@ -108,7 +116,7 @@ def check_grouping(_list, _lut):
 
 parser = argparse.ArgumentParser(description='PREPARE SEED/TARGET MASKS')
 parser.add_argument("--path", help='Define input directory.', type=str, default = '/data')
-parser.add_argument("--atlas", help='Define atlas name.', type=str, default = 'MAPA')
+parser.add_argument("--atlas", help='Define atlas name.', type=str, default = 'MAPA3')
 parser.add_argument("--seed", help='Define <<seed>> ROIs.', type=str, default = 'Id8')
 parser.add_argument("--outdir", help='Define <<output directory>>.', type=str, default = '/data/MAPA-ROI2BRAIN-Id8')
 
@@ -145,9 +153,12 @@ ids = list(numpy.unique(data[data>0]))
 if not len(ids) == ids[-1].astype(int) or not lut.shape[0] == data.max():
     log_msg('UPDATE | parcellation volume is not MRTrix3 compatible. Preparing updated image.')
     parc_mrtrix, lut_mrtrix = get_mrtrix_compatibility(data)
+    lut_update = update_mrtrix_lut(lut,ids)
     save_image(parc_mrtrix, os.path.join(args.path, args.atlas, f'{args.atlas}_mrtrix3.nii.gz'), affine)
-    numpy.savetxt(os.path.join(args.path, args.atlas, 'lut_mrtrix3.tsv'), lut_mrtrix, delimiter = '\t', fmt ='%s')
+    numpy.savetxt(os.path.join(args.path, args.atlas, 'lut_mrtrix3_mapping.tsv'), lut_mrtrix, delimiter = '\t', fmt ='%s')
+    numpy.savetxt(os.path.join(args.path, args.atlas, 'lut_mrtrix3.tsv'), lut_update, delimiter = '\t', fmt ='%s')
     data = parc_mrtrix.copy()
+
 
 
 # ---- define ROI variables  ---- #
