@@ -78,10 +78,12 @@ fi
 
 log_msg "UPDATE | Compute ROI connectome."
 
-tck2connectome -force -quiet \
+tck2connectome -force -quiet -symmetric -zero_diagonal \
     "${OutDir}/tracts/${Seed}_subset.tck" \
     "${ParcImage}" \
     "${OutDir}/weights/${Seed}.tsv"
 
+
+python ${SRCDIR}/roi2brain_weight_cleanup.py --path=${OutDir} --roi=${Seed} --atlas=${Atlas}
 
 log_msg "FINISHED | Extracting ROI based connectivity."

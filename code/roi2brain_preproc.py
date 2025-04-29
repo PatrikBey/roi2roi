@@ -117,8 +117,8 @@ def check_grouping(_list, _lut):
 parser = argparse.ArgumentParser(description='PREPARE SEED/TARGET MASKS')
 parser.add_argument("--path", help='Define input directory.', type=str, default = '/data')
 parser.add_argument("--atlas", help='Define atlas name.', type=str, default = 'MAPA3')
-parser.add_argument("--seed", help='Define <<seed>> ROIs.', type=str, default = 'Id8')
-parser.add_argument("--outdir", help='Define <<output directory>>.', type=str, default = '/data/MAPA-ROI2BRAIN-Id8')
+parser.add_argument("--seed", help='Define <<seed>> ROIs.', type=str, default = 'OP2')
+parser.add_argument("--outdir", help='Define <<output directory>>.', type=str, default = '/data/MAPA-ROI2BRAIN-OP2')
 
 args = parser.parse_args()
 
@@ -150,14 +150,16 @@ data = atlas.get_fdata()
 
 # ---- validate MRTrix3 compatibility of parcellation ---- #
 ids = list(numpy.unique(data[data>0]))
+
 if not len(ids) == ids[-1].astype(int) or not lut.shape[0] == data.max():
     log_msg('UPDATE | parcellation volume is not MRTrix3 compatible. Preparing updated image.')
     parc_mrtrix, lut_mrtrix = get_mrtrix_compatibility(data)
     lut_update = update_mrtrix_lut(lut,ids)
     save_image(parc_mrtrix, os.path.join(args.path, args.atlas, f'{args.atlas}_mrtrix3.nii.gz'), affine)
     numpy.savetxt(os.path.join(args.path, args.atlas, 'lut_mrtrix3_mapping.tsv'), lut_mrtrix, delimiter = '\t', fmt ='%s')
-    numpy.savetxt(os.path.join(args.path, args.atlas, 'lut_mrtrix3.tsv'), lut_update, delimiter = '\t', fmt ='%s')
+    numpy.savetxt(os.path.join(args.path, args.atlas, 'lut_mrtrix3.tsv'), lut_update, delimiter = ';', fmt ='%s')
     data = parc_mrtrix.copy()
+    lut = lut_update
 
 
 
@@ -173,4 +175,8 @@ filename = os.path.join(outdir, 'roi_masks' ,f'{args.seed}.nii.gz')
 save_image(tmp, filename, affine)
 
 log_msg('FINISHED | preparing ROI seed mask and atlas.')
+
+
+
+
 

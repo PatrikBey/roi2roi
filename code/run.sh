@@ -65,10 +65,11 @@ if [[ -z ${target} ]] && [[ -z ${singleseed} ]] ; then
     show_usage
 fi
 
-if [[ ${target,,}='brain' ]]; then
+if [[ ${target,,} = 'brain' ]]; then
     log_msg "UPDATE | extracting ${seed} to full brain connectivity."
     singleseed="TRUE"
 fi
+
 if [[ -z ${atlas} ]]; then
     log_msg "ERROR | no atlas defined."
     show_usage

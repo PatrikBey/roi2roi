@@ -82,6 +82,20 @@ def save_image(_array, _filename, _affine):
     nii = nibabel.Nifti1Image(_array, _affine)
     nii.to_filename(_filename)
 
+def update_mrtrix_lut(_lut, _ids):
+    '''
+    adjust the updated MRtrix3 compatible LUT
+    with ROI names
+    '''
+    lut_update = _lut.copy()
+    lut_ids = list(_lut[:,0])
+    del_ids = []
+    for i in lut_ids[1:]:
+        if not float(i) in _ids:
+            del_ids.append(lut_ids.index(i))
+    lut_update = numpy.delete(lut_update, del_ids,axis = 0)
+    lut_update[1:,0] = numpy.arange(1,len(_ids)+1)
+    return(lut_update)
 
 def get_mrtrix_compatibility(img):
     '''
@@ -149,12 +163,15 @@ data = atlas.get_fdata()
 
 # ---- validate MRTrix3 compatibility of parcellation ---- #
 ids = list(numpy.unique(data[data>0]))
-if not len(ids) == ids[-1].astype(int):
+if not len(ids) == ids[-1].astype(int) or not lut.shape[0] == data.max():
     log_msg('UPDATE | parcellation volume is not MRTrix3 compatible. Preparing updated image.')
     parc_mrtrix, lut_mrtrix = get_mrtrix_compatibility(data)
+    lut_update = update_mrtrix_lut(lut,ids)
     save_image(parc_mrtrix, os.path.join(args.path, args.atlas, f'{args.atlas}_mrtrix3.nii.gz'), affine)
-    numpy.savetxt(os.path.join(args.path, args.atlas, 'lut_mrtrix3.tsv'), lut_mrtrix, delimiter = '\t', fmt ='%s')
+    numpy.savetxt(os.path.join(args.path, args.atlas, 'lut_mrtrix3_mapping.tsv'), lut_mrtrix, delimiter = '\t', fmt ='%s')
+    numpy.savetxt(os.path.join(args.path, args.atlas, 'lut_mrtrix3.tsv'), lut_update, delimiter = ';', fmt ='%s')
     data = parc_mrtrix.copy()
+    lut = lut_update
 
 
 # ---- define ROI variables  ---- #

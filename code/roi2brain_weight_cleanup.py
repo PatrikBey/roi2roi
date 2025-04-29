@@ -54,6 +54,13 @@ def get_id(_roi, _grouping, _lut):
     '''
     return(_lut[numpy.where(_lut[:,_grouping] == _roi)[0],0].astype(numpy.int64))
 
+def save_image(_array, _filename, _affine):
+    '''
+    save _array as Nifti volume
+    '''
+    nii = nibabel.Nifti1Image(_array, _affine)
+    nii.to_filename(_filename)
+
 
 #########################################
 #                                       #
@@ -68,7 +75,8 @@ parser.add_argument("--roi", help='Define input seed ROI.', type=str, default = 
 parser.add_argument("--atlas", help='define atlas used', type=str, default='MAPA3')
 args = parser.parse_args()
 
-log_msg('START | Combining ROI pair wise connection weights.')
+log_msg(f'START | Extracting {args.roi}2brain conenctivity vector.')
+
 
 # ---- load atlas parcellation ---- #
 if os.path.isfile(os.path.join(os.path.dirname(args.path), args.atlas, f'{args.atlas}_mrtrix3.nii.gz')):
@@ -76,10 +84,11 @@ if os.path.isfile(os.path.join(os.path.dirname(args.path), args.atlas, f'{args.a
 else:
     atlas = nibabel.load(os.path.join(os.path.dirname(args.path), args.atlas, f'{args.atlas}_MNI152.nii.gz'))
 
+affine = atlas.affine
 data = atlas.get_fdata()
 
 # ---- load atlas LUT ---- #
-if os.path.isdir(os.path.join(os.path.dirname(args.path), args.atlas, 'lut_mrtrix3.tsv')):
+if os.path.isfile(os.path.join(os.path.dirname(args.path), args.atlas, 'lut_mrtrix3.tsv')):
     lut = numpy.genfromtxt(os.path.join(os.path.dirname(args.path), args.atlas, 'lut_mrtrix3.tsv'), dtype = str, delimiter = ';')
 else:
     lut = numpy.genfromtxt(os.path.join(os.path.dirname(args.path), args.atlas, 'lut.tsv'), dtype = str, delimiter = ';')
@@ -90,16 +99,34 @@ weight_file = os.path.join(args.path, 'weights', f'{args.roi}.tsv')
 
 weights = numpy.genfromtxt(weight_file)
 
+atlas_dim = weights.shape[1]
 
-roiid = get_id(args.roi, check_grouping([args.roi], lut), lut)
+grouping = check_grouping([args.roi],lut)
+roiid = get_id(args.roi, grouping, lut)
 
 # ---- get ROI seed connectivity row ---- #
 
 roi_connectivity = weights[roiid-1,:]
 
+combined = numpy.zeros([2,atlas_dim]).astype(object)
+combined[0,:] = list(lut[1:,grouping])
+combined[1,:] = roi_connectivity
 
-roi_connectivity = numpy.delete(roi_connectivity,roiid-1)
+
+# ---- fill volume with connection strength ---- #
+parc_strength = numpy.zeros(data.shape)
+for i in numpy.arange(roi_connectivity.shape[1]):
+    parc_strength = parc_strength + numpy.where(data == i,roi_connectivity[0,i],0)
 
 
+
+roi_connectivity = numpy.delete(combined,roiid-1, axis = 1)
+
+# ---- save connectivity vector and volume ---- #
+save_image(parc_strength, os.path.join(args.path,'weights',f'{args.roi}-connectivity.nii.gz'), affine)
+numpy.savetxt(os.path.join(args.path, 'weights', f'{args.roi}2brain.tsv'), roi_connectivity, fmt = '%s')
+
+
+log_msg(f'FINISHED | Extracting {args.roi}2brain conenctivity vector.')
 
 

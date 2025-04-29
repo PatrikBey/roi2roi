@@ -3,15 +3,16 @@
 docker run -it -v /mnt/h/Research/ROI2ROI/Data:/data roi2roi:dev bash
 
 export atlas="MAPA3"
-
+Atlas=$atlas
 export Path="/data"
-export seed="pOFC"
+export seed="OP2"
+Seed=$seed
 # seed based
 # seed="/data/lesion_test.nii.gz"
 # roi based
 # export seed="Frontal_Sup_Medial_L"
 export target="brain"
-export OutDir="/data/MAPA-ROI2BRAIN-${seed}"
+export OutDir="/data/${atlas}-ROI2BRAIN-${seed}"
 
 
 
@@ -116,3 +117,30 @@ docker run -v /mnt/h/Research/ROI2ROI/Data:/data roi2roi:dev python get_atlas_up
 
 
 docker run -v /mnt/h/Research/ROI2ROI/Data:/data -e atlas="MAPA3-agranular" -e seed="agranular" -e target="brain" -e OutDir="/data/MAPA3-ROI2BRAIN-agranular" roi2roi:dev
+
+
+
+
+def check_grouping(_list, _lut):
+    '''
+    return grouping dimension of ROI names
+    from given LUT
+    '''
+    # initialize grouping counter to spot non-uniqueness
+    count = 0
+    for group in numpy.arange(_lut.shape[1]):
+        if _list[0] in _lut[:,group]:
+            log_msg(f'UPDATE | using ROIs defined in <<{_lut[0, group]}>>')
+            count += 1
+            out = group
+    if count > 1:
+        log_msg(f'ERROR | Found multiple entries for seeds in look-up table.')
+        sys.exit(1)
+    return(out)
+
+
+
+
+
+
+
