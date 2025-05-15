@@ -74,6 +74,26 @@ get_tract_subset() {
         -include ${1}
 }
 
+# get_pair_tract() {
+#     # extract ROI pair
+#     # tracts
+#     # $1 seed ROI mask
+#     # $2 target ROI mask
+#     # $3 minimal tract length
+#     # $4 maximum tract length
+#     WD=$( dirname $( dirname $( dirname ${2})))
+#     if [[ ! -d "${WD}/tracts" ]]; then
+#         mkdir -p "${WD}/tracts"
+#     fi
+#     tckedit -force -quiet \
+#         "${WD}/tracts/full_mask_subset.tck" \
+#         -include ${1} \
+#         -include ${2} \
+#         -minlength ${3} \
+#         -maxlength ${4} \
+#         "${WD}/tracts/$(basename ${1%.nii.gz})-$( basename ${2%.nii.gz}).tck"    
+# }
+
 get_pair_tract() {
     # extract ROI pair
     # tracts
@@ -86,7 +106,7 @@ get_pair_tract() {
         mkdir -p "${WD}/tracts"
     fi
     tckedit -force -quiet \
-        "${WD}/tracts/full_mask_subset.tck" \
+        "${TEMPLATEDIR}/dTOR_full_tractogram.tck" \
         -include ${1} \
         -include ${2} \
         -minlength ${3} \
@@ -94,6 +114,11 @@ get_pair_tract() {
         "${WD}/tracts/$(basename ${1%.nii.gz})-$( basename ${2%.nii.gz}).tck"    
 }
 
+# get_pair_tract() {
+#     # using connectome2tck for
+#     # tract extraction via endpoints
+
+# }
 
 get_pair_parc() {
     # create temporary parcellation volume for given

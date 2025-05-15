@@ -128,7 +128,7 @@ def get_mrtrix_compatibility(img):
 
 parser = argparse.ArgumentParser(description='PREPARE SEED/TARGET MASKS')
 parser.add_argument("--path", help='Define input directory.', type=str, default = '/data')
-parser.add_argument("--atlas", help='Define atlas name.', type=str, default = 'AAL3')
+parser.add_argument("--atlas", help='Define atlas name.', type=str, default = 'MAPA3Test')
 parser.add_argument("--seed", help='Define <<seed>> ROIs.', type=str, default = 'Insula_L,Occipital_Mid_L')
 parser.add_argument("--target", help='Define <<target>> ROIs.', type=str, default = 'Amygdala_R')
 parser.add_argument("--outdir", help='Define <<output directory>>.', type=str, default = None)

@@ -70,9 +70,9 @@ def save_image(_array, _filename, _affine):
 
 
 parser = argparse.ArgumentParser(description=' ')
-parser.add_argument("--path", help='Define input directory.', type=str, default = '/data/MAPA3-ROI2BRAIN-pOFC')
-parser.add_argument("--roi", help='Define input seed ROI.', type=str, default = 'pOFC')
-parser.add_argument("--atlas", help='define atlas used', type=str, default='MAPA3')
+parser.add_argument("--path", help='Define input directory.', type=str, default = '/data/MAPA3Hemi-ROI2BRAIN-Op2_L')
+parser.add_argument("--roi", help='Define input seed ROI.', type=str, default = 'Op2_L')
+parser.add_argument("--atlas", help='define atlas used', type=str, default='MAPA3Hemi')
 args = parser.parse_args()
 
 log_msg(f'START | Extracting {args.roi}2brain conenctivity vector.')
@@ -115,8 +115,12 @@ combined[1,:] = roi_connectivity
 
 # ---- fill volume with connection strength ---- #
 parc_strength = numpy.zeros(data.shape)
-for i in numpy.arange(roi_connectivity.shape[1]):
-    parc_strength = parc_strength + numpy.where(data == i,roi_connectivity[0,i],0)
+empty = numpy.array([0.])
+for i in numpy.arange(1,roi_connectivity.shape[1]):
+    tmp = numpy.where(data == i,roi_connectivity[0,i],0)
+    if roi_connectivity[0,i] != 0. :
+        tmp = tmp / len(numpy.where(tmp!=0)[0])
+    parc_strength = parc_strength + tmp
 
 
 

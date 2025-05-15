@@ -185,9 +185,9 @@ if [[ ${singleseed} = "TRUE" ]]; then
 
 else
 
-    '''
+    # '''
 
-    '''
+    # '''
     log_msg "START | Extract ROI pair(s) connectivities."
 
     # ---- PREPARING ROI MASKS ---- #

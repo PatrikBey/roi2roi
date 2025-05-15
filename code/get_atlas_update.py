@@ -63,7 +63,8 @@ def get_id(_roi, _grouping, _lut):
     '''
     return ID for a given ROI
     '''
-    return(_lut[numpy.where(_lut[:,_grouping] == _roi)[0],0].astype(numpy.int64))
+    return(numpy.where(_lut[:,_grouping] == _roi)[0].astype(numpy.int64))
+    # return(_lut[numpy.where(_lut[:,_grouping] == _roi)[0],0].astype(numpy.int64))
 
 def get_rois():
     '''
@@ -88,9 +89,9 @@ def save_image(_array, _filename, _affine):
 
 parser = argparse.ArgumentParser(description='prepare atlas ROIs')
 parser.add_argument("--path", help='Define input directory.', type=str, default = '/data')
-parser.add_argument("--atlas", help='Define input atlas.', type=str, default = 'MAPA3')
-parser.add_argument("--update", help='Define update ROI naming.', type=str, default = 'dysgranular')
-parser.add_argument("--grouping", help='Define ROIs to concatenate.', type=str, default = 'Id8,Id3,Id4,Id6,Id7,Id10,Id2,Id1,Id5,Id9')
+parser.add_argument("--atlas", help='Define input atlas.', type=str, default = 'MAPA3Hemi')
+parser.add_argument("--update", help='Define update ROI naming.', type=str, default = 'agranular')
+parser.add_argument("--grouping", help='Define ROIs to concatenate.', type=str, default = 'Ia2_L,Ia3_L,Ia1_L,Ia2_R,Ia3_R,Ia1_R')
 
 args = parser.parse_args()
 
@@ -117,16 +118,17 @@ grouping = check_grouping(rois, lut)
 
 roi_ids = [ get_id(r, grouping, lut) for r in rois ]
 roi_ids.sort()
+new_id = lut[roi_ids[0],0].astype(numpy.int64)
+lut_update = numpy.delete(lut, roi_ids[1:], axis = 0)
 
-lut_update = numpy.delete(lut, roi_ids[:-1], axis = 0)
-
-lut_update[roi_ids[0]-1,grouping] = args.update
+lut_update[new_id,0] = str(new_id[0])
+lut_update[new_id,grouping] = args.update
 
 dims = numpy.arange(1,lut.shape[1])
 
 for d in dims:
     if not d == grouping:
-        lut_update[roi_ids[0]-1,d] = ''
+        lut_update[new_id,d] = ''
 
 
 data_update = data.copy()
