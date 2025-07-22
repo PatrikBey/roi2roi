@@ -155,11 +155,18 @@ get_list_size() {
     # return length of given ROI list
     # ${1}: roi list
     count=0
-    for r in ${target_list}; do
+    for r in ${1}; do
         count=$((count+1))
     done
     export list_size=${count}
 }
+
+get_file_count() {
+    # return number of files in
+    # file list variable
+    export filecount=$( echo ${1} | wc -w )
+}
+
 
 # 4. get_temp_dir
 
